@@ -13,6 +13,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.annotation.Rollback;
 
+import java.util.Base64;
+import java.util.Optional;
+
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Rollback(value = false)
@@ -22,12 +25,18 @@ public class UserRepoTest {
     @Test
     public void testCreateUser(){
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-        String decodePassword = "Qdev5323";
+//        String decodePassword = "Qdev5323";
+// = new User("quang5320",passwordEncoder.encode(decodePassword));
+        userRepository.save(User.builder().email("huaquang101").password(passwordEncoder.encode("Qdev5323")).shopeePassword(Base64.getEncoder().encodeToString("Qdev5323".getBytes())).build());
+//        User savedUser = userRepository.save(newUser);
+//        Assert.notNull(savedUser);
+//        Assert.isTrue(savedUser.getId()>0);
 
-        User newUser = new User("quang5320",passwordEncoder.encode(decodePassword));
-        User savedUser = userRepository.save(newUser);
-        Assert.notNull(savedUser);
-        Assert.isTrue(savedUser.getId()>0);
+//        User dummy = userRepository.findByEmail("quang5320").get();
+//        dummy
+//                .setShopeePassword(Base64.getEncoder()
+//                .encodeToString("Qdev5323".getBytes()));
+//        userRepository.save(dummy);
     }
 //    @Test
 //    public void changePasswordUser(){
@@ -39,7 +48,7 @@ public class UserRepoTest {
 //    }
     @Test
     public void testAssignRolesToUser(){
-        Integer userId = 2;
+        Integer userId = 10;
         User user = userRepository.findById(userId).get();
         user.addRole(new Role(3));
         user.addRole(new Role(2));

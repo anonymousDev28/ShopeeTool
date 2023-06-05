@@ -1,11 +1,10 @@
 package com.techmaster.shopeetool.model;
 
+import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-
-import javax.persistence.*;
 import java.util.*;
 
 @Entity
@@ -13,6 +12,7 @@ import java.util.*;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 @Table(name = "users")
 public class User implements UserDetails {
     @Id
@@ -22,30 +22,20 @@ public class User implements UserDetails {
     private String email;
     @Column(nullable = false,unique = true,length = 64)
     private String password;
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "users_roles",
             joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id")
     )
     private Set<Role> roleSet = new HashSet<>();
+
+    @Column(name = "shopee_password")
+    private String shopeePassword;
+
     public User(String email, String password) {
         this.email = email;
         this.password = password;
-    }
-//    @OneToMany(mappedBy = "user")
-//    private List<Order> orders;
-
-    public void setId(Integer id) {
-        this.id = id;
-    }
-
-    public Set<Role> getRoleSet() {
-        return roleSet;
-    }
-
-    public void setRoleSet(Set<Role> roleSet) {
-        this.roleSet = roleSet;
     }
     public void addRole(Role role){
         this.roleSet.add(role);

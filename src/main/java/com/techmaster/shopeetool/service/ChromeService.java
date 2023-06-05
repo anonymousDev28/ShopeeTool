@@ -2,6 +2,8 @@ package com.techmaster.shopeetool.service;
 
 import com.techmaster.shopeetool.dto.ProductDTO;
 import com.techmaster.shopeetool.dto.ResponseProductDTO;
+import com.techmaster.shopeetool.dto.UserDto;
+import com.techmaster.shopeetool.model.User;
 import com.techmaster.shopeetool.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.openqa.selenium.*;
@@ -12,66 +14,34 @@ import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
+@EnableScheduling
 @Service
 @Slf4j
-//@Configuration
 public class ChromeService {
-//    @Bean
-//    public PasswordEncoder passwordEncoder(){
-//        return new BCryptPasswordEncoder();
-//    }
     @Autowired
     UserRepository userRepository;
-    //private Logger logger = LoggerFactory.getLogger(ChromeService.class);
-//    public void startChrome() throws InterruptedException {
-//        System.setProperty("webdriver.chrome.driver",
-//                "C:\\Users\\Tommy\\Desktop\\Learn\\tool\\chromedriver_win32\\chromedriver.exe");
-//        //Create a map to store  preferences
-//        Map<String, Object> prefs = new HashMap<String, Object>();
-//        //add key and value to map as follows to switch off browser notification
-//        //Pass the argument 1 to allow and 2 to block
-//        prefs.put("profile.default_content_setting_values.notifications", 2);
-//        //Create an instance of ChromeOptions
-//        ChromeOptions options = new ChromeOptions();
-//        // set ExperimentalOption - prefs
-//        options.setExperimentalOption("prefs", prefs);
-//        options.addArguments("--remote-allow-origins=*");
-//        WebDriver driver = new ChromeDriver(options);
-//        // Open website
-//        driver.get("https://shopee.vn/buyer/login?is_from_signup=true&next=https%3A%2F%2Fshopee.vn%2F%3Fis_from_signup%3Dtrue");
-//        // Maximize the browser
-//        driver.manage().window().maximize();
-//        Login("quang5320","Qdev5323",driver);
-//        searchProduct("Tủ Lạnh",driver);
-//        filterPriceLowToHigh(driver);
-//        filterShopMall(driver);
-//        filterRatting(5,driver);
-//        String[] shipOps = {"Nhanh"};
-//        filterShippingOpition(shipOps,driver);
-//        String[] dis = {"Hà Nội"};
-//        filterDistributor(dis,driver);
-//        buy(driver);
-//    }
+    private Semaphore semaphore;
     public void Login(String userName,String passWord,WebDriver driver)throws InterruptedException{
-//        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(60));
         WebElement inputUserName = driver.findElement(By.xpath("//*[@id=\"main\"]/div/div[2]/div/div/div/div[2]/form/div/div[2]/div[2]/div[1]/input"));
-        System.out.println(userName);
         inputUserName.sendKeys(userName);
         WebElement inputPassWord = driver.findElement(By.xpath("//*[@id=\"main\"]/div/div[2]/div/div/div/div[2]/form/div/div[2]/div[3]/div[1]/input"));
         inputPassWord.sendKeys(passWord);
         Thread.sleep(2000);
 //        WebElement loginButton = wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//*[@id=\"main\"]/div/div[2]/div/div/div/div[2]/form/div/div[2]/button")));
         WebElement loginButton = driver.findElement(By.xpath("//*[@id=\"main\"]/div/div[2]/div/div/div/div[2]/form/div/div[2]/button"));
-        System.out.println(loginButton.getText());
         loginButton.click();
         Thread.sleep(2000);
         WebElement adCloseButton = null;
@@ -225,8 +195,10 @@ public class ChromeService {
         // Maximize the browser
         driver.manage().window().maximize();
         System.out.println(productDTO.getUsername());
-        String passwordEncode = userRepository.findByEmail(productDTO.getUsername()).get().getPassword();
-        Login(productDTO.getUsername(), passwordEncode, driver);
+        String passwordShopeeEncoded = userRepository.findByEmail(productDTO.getUsername()).get().getShopeePassword();
+        byte[] passwordEncoded = Base64.getDecoder().decode(passwordShopeeEncoded);
+        String passwordDecoded = new String(passwordEncoded);
+        Login(productDTO.getUsername(), passwordDecoded, driver);
         searchProduct(productDTO.getProductName(), driver);
         filterPriceLowToHigh(driver);
         String[] shipOps = {"Nhanh"};
@@ -321,5 +293,81 @@ public class ChromeService {
         int startIndex = styleAttribute.indexOf("(\"")+2;
         int endIndex = styleAttribute.indexOf("\")");
         return styleAttribute.substring(startIndex,endIndex);
+    }
+
+//    {1 2 4 2 6 7 }
+//    public Queue<UserDto> getAccountFromDatabase(){
+//        // take a queue of account and pass word from repository
+//        Queue<UserDto> queueUsers = new LinkedList<>();
+//        List<User> usersFromRepo =  userRepository.findAll();
+//
+//    }
+    @Scheduled(cron = "10 25 23 * * ?")
+    public void autoFarmShopeeCoins() throws InterruptedException {
+        System.setProperty("webdriver.chrome.driver",
+                "C:\\Users\\Tommy\\Desktop\\Learn\\tool\\chromedriver_win32\\chromedriver.exe");
+        //Create a map to store  preferences
+        Map<String, Object> prefs = new HashMap<>();
+        //add key and value to map as follows to switch off browser notification
+        //Pass the argument 1 to allow and 2 to block
+        prefs.put("profile.default_content_setting_values.notifications", 2);
+        //Create an instance of ChromeOptions
+        ChromeOptions options = new ChromeOptions();
+        // set ExperimentalOption - prefs
+        options.setExperimentalOption("prefs", prefs);
+        options.addArguments("--remote-allow-origins=*");
+        // Get list of users
+        List<User> users = userRepository.findAll();
+        this.semaphore = new Semaphore(users.size());
+        Instant startTime = Instant.now(); // Lưu thời điểm bắt đầu chạy
+        // Create a fixed thread pool with a maximum of 5 threads
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+        Thread.sleep(2000);
+        //Iterate through each user account and submit a task to the thread pool
+        for (User userAccount : users) {
+            executor.submit(() -> {
+                try {
+                    semaphore.acquire();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                WebDriver driver = new ChromeDriver(options);
+                // Open website
+                driver.get("https://shopee.vn/shopee-coins");
+                // Maximize the browser
+                driver.manage().window().maximize();
+                WebElement loginBtn = driver.findElement(By.xpath("//*[@id=\"main\"]/div/div[2]/div/main/section[1]/div[1]/div/section/div[2]/div/button"));
+                loginBtn.click();
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                try {
+                    byte[] passwordEncoded = Base64.getDecoder().decode(userAccount.getShopeePassword());
+                    String passwordDecoded = new String(passwordEncoded);
+                    System.out.println(userAccount.getUsername());
+                    Login(userAccount.getUsername(), passwordDecoded, driver);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                WebElement claimsBtn = driver.findElement(By.xpath("//*[@id=\"main\"]/div/div[2]/div/main/section[1]/div[1]/div/section/div[2]/div/button"));
+                try {
+                    Thread.sleep(4000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                claimsBtn.click();
+                driver.quit();
+                semaphore.release();
+            });
+        }
+
+        //Shutdown the thread pool when all tasks have been completed
+        executor.shutdown();
+        executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        Instant endTime = Instant.now(); // Lấy thời điểm hiện tại
+        Duration totalTime = Duration.between(startTime, endTime); // Tính thời gian chạy
+        System.out.println("Total time: " + totalTime.getSeconds() + " seconds");
     }
 }
